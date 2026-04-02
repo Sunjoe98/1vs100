@@ -176,6 +176,64 @@ Im Terminal mit laufendem Server:
 - **Smartphone erreicht den Server nicht**: Prüfen, ob wirklich die lokale IP (nicht `localhost`) verwendet wird und Firewall-Regeln passen.
 - **Änderungen erscheinen nicht**: Seite hart neu laden oder optional mit `npx nodemon server.js` entwickeln.
 
+## Bestehende Installation auf aktuelles Design aktualisieren
+
+Wenn du das Projekt schon einmal gestartet hast, mach genau diese Schritte:
+
+1. Im Projektordner prüfen, ob du im richtigen Repo bist:
+
+   ```bash
+   pwd
+   git status
+   ```
+
+2. Neueste Änderungen holen:
+
+   ```bash
+   git pull
+   ```
+
+3. Abhängigkeiten neu installieren (wichtig nach UI/Server-Updates):
+
+   ```bash
+   npm install
+   ```
+
+4. Laufenden Server stoppen (`Ctrl + C`) und neu starten:
+
+   ```bash
+   npm start
+   ```
+
+5. Browser hart neu laden (Cache leeren), damit das neue Design sicher angezeigt wird:
+   - Windows/Linux: `Strg + Shift + R`
+   - macOS: `Cmd + Shift + R`
+
+6. Richtige URLs öffnen:
+   - Startseite: `http://localhost:3000/`
+   - Moderator: `http://localhost:3000/host.html`
+   - Beamer/Arena: `http://localhost:3000/arena.html`
+   - Spieler: `http://localhost:3000/player.html`
+
+### Falls noch altes Design erscheint
+
+- Inkognito-Fenster testen (um Browser-Cache auszuschließen).
+- Prüfen, ob wirklich der richtige Branch aktiv ist:
+
+  ```bash
+  git branch --show-current
+  git log --oneline -n 5
+  ```
+
+- Wenn nötig lokal hart auf Remote-Stand setzen (Achtung: verwirft lokale uncommittete Änderungen):
+
+  ```bash
+  git fetch
+  git reset --hard origin/$(git branch --show-current)
+  npm install
+  npm start
+  ```
+
 ## Erweiterungsideen
 
 - Authentifizierung über Spielcode/Lobby-Key
