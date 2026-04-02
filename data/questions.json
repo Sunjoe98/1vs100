@@ -1,0 +1,27 @@
+[
+  {
+    "prompt": "Welche Schweizer Stadt ist bekannt für den Jet d'Eau?",
+    "options": ["Genf", "Zürich", "Basel", "Bern"],
+    "correctIndex": 0
+  },
+  {
+    "prompt": "Wie viele Kantone hat die Schweiz?",
+    "options": ["24", "26", "28", "30"],
+    "correctIndex": 1
+  },
+  {
+    "prompt": "Welches Gebäck wird traditionell an einem 1. August gegessen?",
+    "options": ["Zopf", "Bretzel", "Nussgipfel", "Schoggiwegge"],
+    "correctIndex": 0
+  },
+  {
+    "prompt": "Welche Farbe dominiert die Flagge des Kantons Wallis?",
+    "options": ["Blau", "Rot", "Gelb", "Grün"],
+    "correctIndex": 1
+  },
+  {
+    "prompt": "Welches Verkehrsmittel ist auf der Jungfraubahn unterwegs?",
+    "options": ["Schiff", "Zahnradbahn", "Seilbahn", "Bus"],
+    "correctIndex": 1
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "name": "1vs100",
+  "version": "1.0.0",
+  "description": "Browserbasiertes 1 gegen 100 Partyspiel mit Host-Ansicht und mobilen Player-Clients",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"No automated tests yet\""
+  },
+  "keywords": [
+    "quiz",
+    "game",
+    "socket.io",
+    "party"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

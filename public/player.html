@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>1 vs 100 | Spieler</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Spieler-Ansicht</h1>
+        <p>Beantworte Fragen in Echtzeit – die falsche Antwort eliminiert dich aus dem Mob.</p>
+      </div>
+      <div class="badge" id="status">Status: nicht verbunden</div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Loslegen</h2>
+        <div class="grid two">
+          <div>
+            <label for="name">Dein Spielername</label>
+            <input id="name" placeholder="z.B. Lea oder Team Blau" />
+          </div>
+          <div style="display: flex; align-items: flex-end">
+            <button id="join">Beitreten</button>
+          </div>
+        </div>
+        <p class="footer-note">Nach dem Beitritt warte auf die erste Frage des Moderators.</p>
+      </section>
+
+      <section class="card">
+        <h2>Frage</h2>
+        <div id="question">Wartet auf den Start durch den Moderator...</div>
+        <div class="option-grid" id="options"></div>
+      </section>
+
+      <section class="card">
+        <h2>Zwischenstand</h2>
+        <div id="score">Punkte: 0</div>
+        <div id="mob">Mob-Grösse: 0</div>
+      </section>
+    </main>
+
+    <script>
+      const socket = io();
+      let joined = false;
+      let latestState = null;
+      let lastAnswer = null;
+
+      document.getElementById('join').addEventListener('click', () => {
+        const name = document.getElementById('name').value;
+        socket.emit('join', { role: 'player', name });
+        joined = true;
+        document.getElementById('status').innerText = 'Status: verbunden';
+        document.getElementById('join').disabled = true;
+        document.getElementById('name').disabled = true;
+      });
+
+      socket.on('state', (state) => {
+        latestState = state;
+        updateScoreboard(state);
+        if (state.activeQuestion) {
+          renderQuestion(state.activeQuestion);
+        }
+      });
+
+      socket.on('question-started', (question) => {
+        lastAnswer = null;
+        renderQuestion(question);
+      });
+
+      socket.on('question-reveal', ({ correctIndex }) => {
+        showReveal(correctIndex);
+      });
+
+      socket.on('game-reset', () => {
+        lastAnswer = null;
+        document.getElementById('question').innerText = 'Mob zurückgesetzt. Warte auf die nächste Frage!';
+        document.getElementById('options').innerHTML = '';
+      });
+
+      function renderQuestion(question) {
+        document.getElementById('question').innerText = `Frage ${question.number}/${question.total}: ${question.prompt}`;
+        const container = document.getElementById('options');
+        container.innerHTML = '';
+        question.options.forEach((text, idx) => {
+          const button = document.createElement('div');
+          button.className = 'option';
+          button.innerText = text;
+          button.dataset.index = idx;
+          button.addEventListener('click', () => submitAnswer(idx));
+          if (lastAnswer === idx) {
+            button.classList.add('selected');
+          }
+          container.appendChild(button);
+        });
+      }
+
+      function submitAnswer(idx) {
+        if (!joined || !latestState || latestState.stage !== 'question') return;
+        lastAnswer = idx;
+        socket.emit('submit-answer', idx);
+        document.querySelectorAll('.option').forEach((node) => {
+          node.classList.toggle('selected', Number(node.dataset.index) === idx);
+        });
+      }
+
+      function showReveal(correctIndex) {
+        document.querySelectorAll('.option').forEach((node) => {
+          const idx = Number(node.dataset.index);
+          node.classList.remove('selected');
+          node.classList.add(idx === correctIndex ? 'correct' : 'wrong');
+        });
+      }
+
+      function updateScoreboard(state) {
+        const me = state.players.find((p) => p.id === socket.id);
+        const score = me ? me.score : 0;
+        const status = me ? me.status : 'nicht beigetreten';
+        document.getElementById('score').innerText = `Punkte: ${score}`;
+        document.getElementById('mob').innerText = `Mob-Grösse: ${state.mobAlive}`;
+        document.getElementById('status').innerText = `Status: ${status}`;
+      }
+    </script>
+  </body>
+</html>
