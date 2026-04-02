@@ -25,6 +25,7 @@ npm start
 
 Öffne danach im Browser:
 - Host-Ansicht: `http://localhost:3000/host.html`
+- Beamer/Arena-Ansicht: `http://localhost:3000/arena.html`
 - Spieler-Ansicht (für Smartphones): `http://localhost:3000/player.html`
 
 ### Hosting im Codex-CLI (diese Umgebung)
@@ -190,7 +191,8 @@ Im Terminal mit laufendem Server:
 ./server.js           # Express + Socket.IO Server, Spiel- und Mob-Logik
 ./public/index.html   # Einstieg mit Links zur Host- und Player-Ansicht
 ./public/host.html    # Moderator-UI: Fragen starten, Antworten auswerten, Mob-Grösse anzeigen
-./public/player.html  # Spieler-UI: Antworten tippen, Punktestand sehen
+./public/arena.html   # Beamer-UI: Zuschaueransicht mit Frage, Verteilung und Reveal
+./public/player.html  # Spieler-UI: Lobby, Antworten und Ergebnis-Feedback
 ./public/styles.css   # Gemeinsames Layout & Styles
 ./data/questions.json # Beispiel-Fragenset
 ```

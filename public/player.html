@@ -3,46 +3,43 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>1 vs 100 | Spieler</title>
+    <title>1 GEGEN 100 | Spieler</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="/socket.io/socket.io.js"></script>
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Spieler-Ansicht</h1>
-        <p>Beantworte Fragen in Echtzeit – die falsche Antwort eliminiert dich aus dem Mob.</p>
-      </div>
-      <div class="badge" id="status">Status: nicht verbunden</div>
-    </header>
+    <div class="player-shell">
+      <header class="topbar">
+        <div class="brand">1 GEGEN <span>100</span></div>
+        <div class="badge" id="status">Status: offline</div>
+      </header>
 
-    <main>
-      <section class="card">
-        <h2>Loslegen</h2>
-        <div class="grid two">
-          <div>
-            <label for="name">Dein Spielername</label>
-            <input id="name" placeholder="z.B. Lea oder Team Blau" />
-          </div>
-          <div style="display: flex; align-items: flex-end">
-            <button id="join">Beitreten</button>
-          </div>
+      <section class="card" id="join-card">
+        <h2>FCB Lobby</h2>
+        <p class="muted">Registriere dich mit deinem Namen und warte auf den Moderator.</p>
+        <div class="grid" style="grid-template-columns: 1fr auto">
+          <input class="field" id="name" placeholder="Dein Name" />
+          <button id="join">Anmelden</button>
         </div>
-        <p class="footer-note">Nach dem Beitritt warte auf die erste Frage des Moderators.</p>
+        <div class="kpi" style="margin-top: 0.8rem">
+          <div class="card center"><small class="muted">Teilnehmer</small><div class="score" id="joined-count">0</div></div>
+          <div class="card center"><small class="muted">Mob aktiv</small><div class="score" id="mob">0</div></div>
+        </div>
+        <div class="lobby-grid" id="lobby-grid" style="margin-top: 0.8rem"></div>
       </section>
 
-      <section class="card">
-        <h2>Frage</h2>
-        <div id="question">Wartet auf den Start durch den Moderator...</div>
+      <section class="card" id="question-card">
+        <h2 id="question-meta">Frage</h2>
+        <p id="question">Warte auf den Start durch den Moderator …</p>
         <div class="option-grid" id="options"></div>
       </section>
 
-      <section class="card">
-        <h2>Zwischenstand</h2>
-        <div id="score">Punkte: 0</div>
-        <div id="mob">Mob-Grösse: 0</div>
+      <section class="card" id="result-card">
+        <h2>Ergebnis</h2>
+        <p id="result-title" class="score">-</p>
+        <p id="result-subtitle" class="muted">-</p>
       </section>
-    </main>
+    </div>
 
     <script>
       const socket = io();
@@ -50,26 +47,25 @@
       let latestState = null;
       let lastAnswer = null;
 
+      socket.emit('join', { role: 'audience' });
+
       document.getElementById('join').addEventListener('click', () => {
         const name = document.getElementById('name').value;
         socket.emit('join', { role: 'player', name });
         joined = true;
-        document.getElementById('status').innerText = 'Status: verbunden';
         document.getElementById('join').disabled = true;
         document.getElementById('name').disabled = true;
       });
 
       socket.on('state', (state) => {
         latestState = state;
-        updateScoreboard(state);
-        if (state.activeQuestion) {
-          renderQuestion(state.activeQuestion);
-        }
+        updateFromState(state);
       });
 
       socket.on('question-started', (question) => {
         lastAnswer = null;
         renderQuestion(question);
+        setStatus('Status: Frage läuft');
       });
 
       socket.on('question-reveal', ({ correctIndex }) => {
@@ -78,51 +74,84 @@
 
       socket.on('game-reset', () => {
         lastAnswer = null;
-        document.getElementById('question').innerText = 'Mob zurückgesetzt. Warte auf die nächste Frage!';
+        document.getElementById('question').innerText = 'Mob wurde zurückgesetzt. Bitte auf neue Frage warten.';
         document.getElementById('options').innerHTML = '';
+        document.getElementById('result-title').innerText = '-';
+        document.getElementById('result-subtitle').innerText = '-';
       });
 
+      function updateFromState(state) {
+        document.getElementById('joined-count').innerText = state.players.length;
+        document.getElementById('mob').innerText = state.mobAlive;
+
+        const grid = document.getElementById('lobby-grid');
+        grid.innerHTML = '';
+        state.players.slice(0, 10).forEach((player, idx) => {
+          const block = document.createElement('div');
+          block.className = 'avatar';
+          block.innerText = player.name?.slice(0, 2).toUpperCase() || String(idx + 1);
+          grid.appendChild(block);
+        });
+
+        if (state.activeQuestion) {
+          renderQuestion(state.activeQuestion);
+        }
+
+        const me = state.players.find((p) => p.id === socket.id);
+        if (!joined && me) joined = true;
+        if (me) {
+          setStatus(`Status: ${me.status === 'alive' ? 'im Spiel' : 'ausgeschieden'} · ${me.score} Punkte`);
+        } else {
+          setStatus(joined ? 'Status: verbunden' : 'Status: nicht beigetreten');
+        }
+      }
+
       function renderQuestion(question) {
-        document.getElementById('question').innerText = `Frage ${question.number}/${question.total}: ${question.prompt}`;
+        document.getElementById('question-meta').innerText = `Frage ${question.number}/${question.total}`;
+        document.getElementById('question').innerText = question.prompt;
+
         const container = document.getElementById('options');
         container.innerHTML = '';
+
         question.options.forEach((text, idx) => {
-          const button = document.createElement('div');
+          const button = document.createElement('button');
           button.className = 'option';
-          button.innerText = text;
           button.dataset.index = idx;
+          button.type = 'button';
+          button.innerHTML = `<span><span class="option-letter">${String.fromCharCode(65 + idx)}</span>${text}</span>`;
           button.addEventListener('click', () => submitAnswer(idx));
-          if (lastAnswer === idx) {
-            button.classList.add('selected');
-          }
+          if (lastAnswer === idx) button.classList.add('selected');
           container.appendChild(button);
         });
       }
 
       function submitAnswer(idx) {
         if (!joined || !latestState || latestState.stage !== 'question') return;
+        const me = latestState.players.find((p) => p.id === socket.id);
+        if (!me || me.status !== 'alive') return;
         lastAnswer = idx;
         socket.emit('submit-answer', idx);
-        document.querySelectorAll('.option').forEach((node) => {
+        document.querySelectorAll('#options .option').forEach((node) => {
           node.classList.toggle('selected', Number(node.dataset.index) === idx);
         });
       }
 
       function showReveal(correctIndex) {
-        document.querySelectorAll('.option').forEach((node) => {
+        const selectedWasCorrect = lastAnswer === correctIndex;
+        document.getElementById('result-title').innerText = selectedWasCorrect ? 'RICHTIG' : 'FALSCH';
+        document.getElementById('result-subtitle').innerText = selectedWasCorrect
+          ? 'Du bist noch im Spiel.'
+          : 'Leider ausgeschieden – du kannst aber weiter zuschauen.';
+
+        document.querySelectorAll('#options .option').forEach((node) => {
           const idx = Number(node.dataset.index);
           node.classList.remove('selected');
           node.classList.add(idx === correctIndex ? 'correct' : 'wrong');
         });
       }
 
-      function updateScoreboard(state) {
-        const me = state.players.find((p) => p.id === socket.id);
-        const score = me ? me.score : 0;
-        const status = me ? me.status : 'nicht beigetreten';
-        document.getElementById('score').innerText = `Punkte: ${score}`;
-        document.getElementById('mob').innerText = `Mob-Grösse: ${state.mobAlive}`;
-        document.getElementById('status').innerText = `Status: ${status}`;
+      function setStatus(text) {
+        document.getElementById('status').innerText = text;
       }
     </script>
   </body>

@@ -16,6 +16,7 @@ let hostId = null;
 let questionIndex = 0;
 let activeQuestion = null;
 let stage = 'lobby';
+let lastReveal = null;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -28,7 +29,11 @@ io.on('connection', (socket) => {
     if (role === 'host') {
       hostId = socket.id;
       socket.emit('host-control', buildHostState());
-    } else {
+      broadcastState();
+      return;
+    }
+
+    if (role === 'player') {
       const displayName = (name || '').trim() || `Spieler ${players.size + 1}`;
       players.set(socket.id, {
         id: socket.id,
@@ -38,6 +43,8 @@ io.on('connection', (socket) => {
         answer: null,
       });
     }
+
+    socket.emit('state', buildPublicState());
     broadcastState();
   });
 
@@ -45,6 +52,7 @@ io.on('connection', (socket) => {
     if (socket.id !== hostId || questions.length === 0) return;
     activeQuestion = questions[questionIndex % questions.length];
     questionIndex += 1;
+    lastReveal = null;
     stage = 'question';
     players.forEach((player) => {
       player.answer = null;
@@ -72,6 +80,7 @@ io.on('connection', (socket) => {
     stage = 'reveal';
     const correctIndex = activeQuestion.correctIndex;
     const eliminated = [];
+
     players.forEach((player) => {
       if (player.status !== 'alive') return;
       if (player.answer === correctIndex) {
@@ -82,11 +91,15 @@ io.on('connection', (socket) => {
       }
       player.answer = null;
     });
-    io.emit('question-reveal', {
+
+    lastReveal = {
       correctIndex,
       eliminated,
       mobAlive: getMobAliveCount(),
-    });
+      answerCounts: getAnswerCounts(activeQuestion.options.length),
+    };
+
+    io.emit('question-reveal', lastReveal);
     broadcastState();
     socket.emit('host-control', buildHostState());
   });
@@ -95,6 +108,7 @@ io.on('connection', (socket) => {
     if (socket.id !== hostId) return;
     questionIndex = 0;
     activeQuestion = null;
+    lastReveal = null;
     stage = 'lobby';
     players.forEach((player) => {
       player.status = 'alive';
@@ -123,11 +137,15 @@ function broadcastState() {
 }
 
 function buildPublicState() {
+  const optionCount = activeQuestion?.options?.length || 0;
+
   return {
     stage,
     questionNumber: questionIndex,
     totalQuestions: questions.length,
     mobAlive: getMobAliveCount(),
+    answerCounts: getAnswerCounts(optionCount),
+    lastReveal,
     players: Array.from(players.values()).map((player) => ({
       id: player.id,
       name: player.name,
@@ -155,6 +173,7 @@ function buildHostState() {
     totalQuestions: questions.length,
     mobAlive: getMobAliveCount(),
     activeQuestion,
+    lastReveal,
     players: Array.from(players.values()),
   };
 }
@@ -165,6 +184,19 @@ function getMobAliveCount() {
     if (player.status === 'alive') alive += 1;
   });
   return alive;
+}
+
+function getAnswerCounts(optionCount) {
+  if (!optionCount) return [];
+  const counts = new Array(optionCount).fill(0);
+  players.forEach((player) => {
+    if (player.status !== 'alive' || player.answer === null || player.answer === undefined) return;
+    const idx = Number(player.answer);
+    if (Number.isInteger(idx) && idx >= 0 && idx < optionCount) {
+      counts[idx] += 1;
+    }
+  });
+  return counts;
 }
 
 const port = process.env.PORT || 3000;

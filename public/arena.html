@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>1 GEGEN 100 | FCB Arena View</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <div class="arena-wrap">
+      <header class="topbar">
+        <div class="brand">1 GEGEN <span>100</span> · Arena</div>
+        <div class="badge" id="prize">CHF 45'500</div>
+      </header>
+
+      <main class="arena-stage">
+        <div class="timer"><span id="timer">--</span></div>
+
+        <section>
+          <div class="question-box">
+            <div class="question-meta" id="meta">Kategorie: Live</div>
+            <div class="question-text" id="question">Warte auf die nächste Frage…</div>
+          </div>
+          <div class="option-grid" id="options"></div>
+        </section>
+      </main>
+    </div>
+
+    <div class="arena-footer">
+      <div class="badge" id="mob">Gegner übrig: 0</div>
+      <small class="muted">Live aus der Arena</small>
+    </div>
+
+    <script>
+      const socket = io();
+      socket.emit('join', { role: 'audience' });
+
+      let countdownHandle = null;
+      let seconds = 0;
+
+      socket.on('state', (state) => {
+        document.getElementById('mob').innerText = `Gegner übrig: ${state.mobAlive}`;
+        if (state.activeQuestion) {
+          renderQuestion(state.activeQuestion, state.answerCounts || []);
+        }
+        if (state.lastReveal) {
+          highlightReveal(state.lastReveal.correctIndex);
+        }
+      });
+
+      socket.on('question-started', (question) => {
+        renderQuestion(question, [0, 0, 0, 0]);
+        startTimer(10);
+      });
+
+      socket.on('question-reveal', ({ correctIndex }) => {
+        stopTimer();
+        highlightReveal(correctIndex);
+      });
+
+      socket.on('game-reset', () => {
+        stopTimer();
+        document.getElementById('meta').innerText = 'Kategorie: Live';
+        document.getElementById('question').innerText = 'Mob wurde zurückgesetzt. Bereit für den nächsten Anpfiff.';
+        document.getElementById('options').innerHTML = '';
+      });
+
+      function renderQuestion(question, counts) {
+        document.getElementById('meta').innerText = `Frage ${question.number}/${question.total}`;
+        document.getElementById('question').innerText = question.prompt;
+        const options = document.getElementById('options');
+        options.innerHTML = '';
+        question.options.forEach((text, idx) => {
+          const el = document.createElement('div');
+          el.className = 'option';
+          el.dataset.index = idx;
+          el.innerHTML = `<span><span class="option-letter">${String.fromCharCode(65 + idx)}</span>${text}</span><strong>${
+            counts[idx] || 0
+          }</strong>`;
+          options.appendChild(el);
+        });
+      }
+
+      function highlightReveal(correctIndex) {
+        document.querySelectorAll('#options .option').forEach((node) => {
+          const idx = Number(node.dataset.index);
+          node.classList.remove('selected');
+          node.classList.add(idx === correctIndex ? 'correct' : 'wrong');
+        });
+      }
+
+      function startTimer(initial) {
+        stopTimer();
+        seconds = initial;
+        document.getElementById('timer').innerText = String(seconds).padStart(2, '0');
+        countdownHandle = setInterval(() => {
+          seconds -= 1;
+          document.getElementById('timer').innerText = String(Math.max(seconds, 0)).padStart(2, '0');
+          if (seconds <= 0) stopTimer();
+        }, 1000);
+      }
+
+      function stopTimer() {
+        if (!countdownHandle) return;
+        clearInterval(countdownHandle);
+        countdownHandle = null;
+      }
+    </script>
+  </body>
+</html>

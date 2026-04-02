@@ -3,45 +3,51 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>1 vs 100 | Host</title>
+    <title>1 GEGEN 100 | Moderator Dashboard</title>
     <link rel="stylesheet" href="/styles.css" />
     <script src="/socket.io/socket.io.js"></script>
   </head>
   <body>
-    <header>
-      <div>
-        <h1>Moderator-Ansicht</h1>
-        <p>Steuere Fragen, eliminiere falsche Antworten und behalte die Mob-Grösse im Blick.</p>
-      </div>
-      <div class="badge" id="mob-count">Mob: --</div>
-    </header>
-
-    <main class="grid two">
-      <section class="card">
-        <h2>Spielsteuerung</h2>
-        <p id="stage">Status: Lobby</p>
-        <div class="grid two">
-          <button id="start-question">Nächste Frage</button>
-          <button id="reveal-answer" disabled>Antwort auswerten</button>
-          <button id="reset-game">Mob zurücksetzen</button>
+    <div class="page">
+      <header class="topbar">
+        <div>
+          <div class="brand">1 GEGEN <span>100</span> · Moderator</div>
+          <p class="muted">Master-Control für Fragen, Auflösung und Mob-Tracking</p>
         </div>
-        <p class="footer-note">
-          Starte eine Frage, lass die Spieler tippen und löse dann die korrekte Antwort auf, um falsche Spieler zu
-          eliminieren.
-        </p>
-      </section>
+        <div class="badge" id="mob-count">Mob: --</div>
+      </header>
 
-      <section class="card" id="question-card">
-        <h2>Aktuelle Frage</h2>
-        <div id="question-text">Noch keine Frage gestartet.</div>
-        <div class="option-grid" id="options"></div>
-      </section>
+      <main class="grid host-layout">
+        <section class="card">
+          <h2>Master Control</h2>
+          <p id="stage" class="muted">Status: Lobby</p>
+          <div class="controls">
+            <button id="start-question">Frage starten</button>
+            <button id="reveal-answer" class="secondary" disabled>Antwort auflösen</button>
+            <button id="reset-game" class="danger">Spiel zurücksetzen</button>
+            <a class="btn secondary" style="text-align: center; text-decoration: none" href="/arena.html" target="_blank"
+              >Beamer-Ansicht öffnen</a
+            >
+          </div>
+        </section>
 
-      <section class="card">
-        <h2>Spielerübersicht</h2>
-        <ul class="list" id="players"></ul>
-      </section>
-    </main>
+        <section class="grid">
+          <article class="card">
+            <h3>Aktive Frage</h3>
+            <div class="question-box">
+              <div class="question-meta" id="question-meta">Warte auf Frage</div>
+              <div class="question-text" id="question-text">Noch keine Runde gestartet.</div>
+            </div>
+            <div class="option-grid" id="options"></div>
+          </article>
+
+          <article class="card">
+            <h3>Mob Status</h3>
+            <ul class="players" id="players"></ul>
+          </article>
+        </section>
+      </main>
+    </div>
 
     <script>
       const socket = io();
@@ -63,75 +69,68 @@
         document.getElementById('reveal-answer').disabled = true;
         highlightOptions(correctIndex);
         document.getElementById('mob-count').innerText = `Mob: ${mobAlive}`;
-        if (eliminated.length > 0) {
-          document.getElementById('stage').innerText = `Ergebnis: ${eliminated.length} Spieler eliminiert`;
-        }
+        document.getElementById('stage').innerText = `Status: Reveal · ${eliminated.length} eliminiert`;
       });
 
       socket.on('game-reset', () => {
         currentQuestion = null;
         document.getElementById('reveal-answer').disabled = true;
-        document.getElementById('question-text').innerText = 'Mob zurückgesetzt. Bereit für eine neue Runde!';
+        document.getElementById('question-meta').innerText = 'Warte auf Frage';
+        document.getElementById('question-text').innerText = 'Mob zurückgesetzt. Bereit für nächste Runde.';
         document.getElementById('options').innerHTML = '';
       });
 
-      socket.on('host-control', (state) => {
-        if (state.mobAlive !== undefined) {
-          document.getElementById('mob-count').innerText = `Mob: ${state.mobAlive}`;
-        }
-      });
-
-      document.getElementById('start-question').addEventListener('click', () => {
-        socket.emit('host-start-question');
-      });
-
-      document.getElementById('reveal-answer').addEventListener('click', () => {
-        socket.emit('host-reveal-answer');
-      });
-
-      document.getElementById('reset-game').addEventListener('click', () => {
-        socket.emit('host-reset-game');
-      });
+      document.getElementById('start-question').addEventListener('click', () => socket.emit('host-start-question'));
+      document.getElementById('reveal-answer').addEventListener('click', () => socket.emit('host-reveal-answer'));
+      document.getElementById('reset-game').addEventListener('click', () => socket.emit('host-reset-game'));
 
       function renderState(state) {
         document.getElementById('stage').innerText = `Status: ${state.stage}`;
         document.getElementById('mob-count').innerText = `Mob: ${state.mobAlive}`;
+
         const list = document.getElementById('players');
         list.innerHTML = '';
         state.players
+          .slice()
           .sort((a, b) => b.score - a.score)
           .forEach((player) => {
             const item = document.createElement('li');
             item.innerHTML = `
-              <span>${player.name}</span>
-              <span>${player.score} Punkte · ${player.status === 'alive' ? 'im Spiel' : 'ausgeschieden'}${
-              player.answered ? ' · Antwort gesendet' : ''
+              <div>
+                <strong>${player.name}</strong>
+                <div class="muted">${player.score} Punkte ${player.answered ? '· Antwort gesendet' : ''}</div>
+              </div>
+              <span class="pill ${player.status === 'alive' ? 'alive' : 'out'}">${
+              player.status === 'alive' ? 'im Spiel' : 'out'
             }</span>`;
             list.appendChild(item);
           });
+
         if (state.activeQuestion) {
           currentQuestion = state.activeQuestion;
-          renderQuestion(currentQuestion);
+          renderQuestion(currentQuestion, state.answerCounts || []);
           document.getElementById('reveal-answer').disabled = false;
         }
       }
 
-      function renderQuestion(question) {
-        document.getElementById('question-text').innerText = `Frage ${question.number}/${question.total}: ${question.prompt}`;
+      function renderQuestion(question, counts = []) {
+        document.getElementById('question-meta').innerText = `Frage ${question.number}/${question.total}`;
+        document.getElementById('question-text').innerText = question.prompt;
         const container = document.getElementById('options');
         container.innerHTML = '';
         question.options.forEach((text, idx) => {
           const option = document.createElement('div');
           option.className = 'option';
-          option.innerText = text;
           option.dataset.index = idx;
+          option.innerHTML = `<span><span class="option-letter">${String.fromCharCode(65 + idx)}</span>${text}</span><strong>${
+            counts[idx] || 0
+          }</strong>`;
           container.appendChild(option);
         });
       }
 
       function highlightOptions(correctIndex) {
-        const container = document.getElementById('options');
-        container.querySelectorAll('.option').forEach((node) => {
+        document.querySelectorAll('#options .option').forEach((node) => {
           const idx = Number(node.dataset.index);
           node.classList.remove('selected');
           node.classList.add(idx === correctIndex ? 'correct' : 'wrong');
